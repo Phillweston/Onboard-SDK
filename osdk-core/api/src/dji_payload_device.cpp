@@ -14,14 +14,11 @@
 PayloadDevice::PayloadDevice(Vehicle *vehicle)
     : vehicle(vehicle)
 {
-
-  this->fromPSDKHandler.callback = getDataFromPSDKCallback;
-  this->fromPSDKHandler.userData = 0;
+  setFromPSDKCallback(getDataFromPSDKCallback, NULL);
 }
 PayloadDevice::~PayloadDevice()
 {
-  this->fromPSDKHandler.callback = 0;
-  this->fromPSDKHandler.userData = 0;
+  setFromPSDKCallback(NULL, NULL);
 }
 Vehicle* PayloadDevice::getVehicle() const
 {
@@ -44,9 +41,8 @@ void PayloadDevice::sendDataToPSDK(uint8_t *data, uint16_t len)
     DERROR("The drone has not been activated");
     return;
   }
-  vehicle->protocolLayer->send(0, vehicle->getEncryption(),
-                               OpenProtocolCMD::CMDSet::Activation::toPayload,
-                               data, len, 500, 1, NULL, 0);
+  vehicle->legacyLinker->send(OpenProtocolCMD::CMDSet::Activation::toPayload,
+                              data, len);
 }
 void PayloadDevice::getDataFromPSDKCallback(Vehicle *vehiclePtr,
                                             RecvContainer recvFrame,
@@ -55,12 +51,16 @@ void PayloadDevice::getDataFromPSDKCallback(Vehicle *vehiclePtr,
 
   if (recvFrame.recvInfo.len - OpenProtocol::PackageMin <= 100)
   {
-    DSTATUS("The len of received payload device data: %d\n", recvFrame.recvInfo.len);
+    DDEBUG("The len of received payload device data: %d\n", recvFrame.recvInfo.len);
   }
 }
 void PayloadDevice::setFromPSDKCallback(VehicleCallBack callback, UserData userData)
 {
   this->fromPSDKHandler.callback = callback;
   this->fromPSDKHandler.userData =  userData;
+  vehicle->legacyLinker->registerCMDCallback(
+      OpenProtocolCMD::CMDSet::Broadcast::fromPayload[0],
+      OpenProtocolCMD::CMDSet::Broadcast::fromPayload[1],
+      fromPSDKHandler.callback, fromPSDKHandler.userData);
 }
 
